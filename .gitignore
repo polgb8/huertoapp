@@ -58,3 +58,7 @@ CLAUDE.md
 AUDITORIA*.md
 SETUP.md
 0_subir_a_github.bat
+
+# Config de EAS (no se usa: el APK se compila con GitHub Actions)
+eas.json
+*.nuevo

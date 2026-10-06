@@ -15,6 +15,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { colors, spacing, radii, gradientes, sombraTarjeta } from '../theme';
 import { Card, Hero, BarraProgreso, TituloSeccion, Casilla, ToastDeshacer, Pastilla, BotonPrimario, EstadoVacio } from '../components/UI';
 import { AvisoUsoGratis, useUsoGratis } from '../components/UsoGratis';
+import { esAdmin } from '../admin';
 import useDatosHuerto, { CATALOGO_PLANO } from '../hooks/useDatosHuerto';
 import { construirHoy } from '../hoy';
 import { aplicarMarca, deshacerMarca } from '../acciones';
@@ -29,7 +30,7 @@ function saludo(fecha = new Date()) {
   return 'Buenas noches 🌙';
 }
 
-export default function HoyScreen() {
+export default function HoyScreen({ email }) {
   const navigation = useNavigation();
   const datos = useDatosHuerto();
   const uso = useUsoGratis();
@@ -157,7 +158,7 @@ export default function HoyScreen() {
         {!!error && <Text style={estilos.error}>{error}</Text>}
         {!!errorAccion && <Text style={estilos.error}>{errorAccion}</Text>}
 
-        <AvisoUsoGratis gemini={uso.gemini} supa={uso.supa} style={estilos.avisoUso} />
+        {esAdmin(email) && <AvisoUsoGratis gemini={uso.gemini} supa={uso.supa} style={estilos.avisoUso} />}
 
         {sinNada && (
           <Card style={estilos.vacio}>

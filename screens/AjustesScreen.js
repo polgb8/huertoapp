@@ -18,6 +18,7 @@ import { useAppStore } from '../store';
 import { refrescarUbicacion } from '../ubicacion';
 import { vaciarColaPendiente } from '../colaOffline';
 import { cancelarTodosLosAvisos } from '../notificaciones';
+import { esAdmin } from '../admin';
 import {
   leerClaveGeminiGuardada,
   guardarClaveGemini,
@@ -310,11 +311,15 @@ export default function AjustesScreen({ email }) {
       </Card>
 
       {/* Uso gratuito */}
-      <View style={estilos.tituloBloque}>
-        <IconoCaja icono="📊" fondo={colors.podaSoft} tamano={34} />
-        <Text style={estilos.tituloBloqueTexto}>Uso del plan gratuito</Text>
-      </View>
-      <TarjetaUsoGratis gemini={uso.gemini} supa={uso.supa} style={estilos.tarjeta} />
+      {esAdmin(email) && (
+        <>
+          <View style={estilos.tituloBloque}>
+            <IconoCaja icono="📊" fondo={colors.podaSoft} tamano={34} />
+            <Text style={estilos.tituloBloqueTexto}>Uso del plan gratuito</Text>
+          </View>
+          <TarjetaUsoGratis gemini={uso.gemini} supa={uso.supa} style={estilos.tarjeta} />
+        </>
+      )}
 
       {/* Ubicación */}
       <Card style={estilos.tarjeta}>

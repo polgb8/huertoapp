@@ -150,7 +150,9 @@ function Pestanias({ email }) {
         ),
       })}
     >
-      <Tab.Screen name="Hoy" component={HoyScreen} options={{ title: 'Hoy', tabBarLabel: 'Hoy' }} />
+      <Tab.Screen name="Hoy" options={{ title: 'Hoy', tabBarLabel: 'Hoy' }}>
+        {() => <HoyScreen email={email} />}
+      </Tab.Screen>
       <Tab.Screen name="Huerto" component={GardenScreen} options={{ title: 'Mi huerto', tabBarLabel: 'Huerto' }} />
       <Tab.Screen name="Escanear" component={ScanScreen} options={{ title: 'Diagnóstico', tabBarLabel: 'Analizar' }} />
       <Tab.Screen name="Planificar" component={PlannerScreen} options={{ title: 'Planificador', tabBarLabel: 'Plantar' }} />
