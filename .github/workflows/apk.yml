@@ -1,0 +1,75 @@
+# ============================================================
+# Compila el APK de Android GRATIS en GitHub (sin cuenta de Expo/EAS) y lo
+# publica en "Releases" para que cualquiera lo descargue e instale.
+# Se ejecuta solo al subir cambios a `main` (o a mano: Actions → Run).
+# ============================================================
+name: Compilar APK
+
+on:
+  push:
+    branches: [main]
+    paths-ignore: ['**.md', 'docs/**']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: apk
+  cancel-in-progress: true
+
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Tests
+        run: npx jest --ci --forceExit --testTimeout=30000
+
+      - name: Generar proyecto Android
+        run: npx expo prebuild --platform android --no-install
+        env:
+          CI: 1
+
+      - name: Compilar APK (release)
+        working-directory: android
+        run: ./gradlew assembleRelease --no-daemon -PreactNativeArchitectures=arm64-v8a,armeabi-v7a -Dorg.gradle.jvmargs="-Xmx4g -XX:MaxMetaspaceSize=1g"
+        env:
+          NODE_ENV: production
+
+      - name: Versión
+        id: version
+        run: echo "v=$(node -p "require('./app.json').expo.version")" >> "$GITHUB_OUTPUT"
+
+      - name: Renombrar APK
+        run: cp android/app/build/outputs/apk/release/app-release.apk "HuertoApp-${{ steps.version.outputs.v }}.apk"
+
+      - name: Publicar en Releases
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.version.outputs.v }}
+          name: HuertoApp ${{ steps.version.outputs.v }}
+          make_latest: true
+          files: HuertoApp-${{ steps.version.outputs.v }}.apk
+          body: |
+            📲 **Descarga `HuertoApp-${{ steps.version.outputs.v }}.apk`** (abajo, en *Assets*) desde tu móvil Android e instálalo.
+            Si Android lo pide, permite «Instalar apps de origen desconocido» para tu navegador.
+
+            Después: crea tu cuenta, ve a **Ajustes** y pega tu clave gratuita de Gemini (https://aistudio.google.com/apikey).
+
+            _Compilación automática ${{ github.run_number }} · commit ${{ github.sha }}_

@@ -1,0 +1,5 @@
+test('expo-constants executionEnvironment en jest', () => {
+  const Constants = require('expo-constants').default;
+  console.log('executionEnvironment:', Constants.executionEnvironment);
+  console.log('appOwnership:', Constants.appOwnership);
+});

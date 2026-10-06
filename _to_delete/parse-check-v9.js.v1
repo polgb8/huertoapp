@@ -1,0 +1,36 @@
+const babel = require('@babel/core');
+const fs = require('fs');
+const path = require('path');
+
+const files = [
+  'App.js',
+  'store.js',
+  'supabase.js',
+  'notificaciones.js',
+  'riego.js',
+  'riego.test.js',
+  'theme.js',
+  'components/UI.js',
+  'screens/ScanScreen.js',
+  'screens/GardenScreen.js',
+  '__tests__/AppFlow.test.js',
+];
+
+let ok = true;
+for (const f of files) {
+  const full = path.join(process.cwd(), f);
+  const code = fs.readFileSync(full, 'utf8');
+  try {
+    babel.parse(code, {
+      babelrc: false,
+      configFile: false,
+      filename: full,
+      plugins: ['@babel/plugin-transform-react-jsx'],
+    });
+    console.log('OK  ', f);
+  } catch (e) {
+    ok = false;
+    console.log('FAIL', f, '->', e.message);
+  }
+}
+process.exit(ok ? 0 : 1);

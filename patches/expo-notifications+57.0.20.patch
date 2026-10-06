@@ -1,0 +1,72 @@
+diff --git a/node_modules/expo-notifications/build/DevicePushTokenAutoRegistration.fx.js b/node_modules/expo-notifications/build/DevicePushTokenAutoRegistration.fx.js
+index 85cd97c..b5037b9 100644
+--- a/node_modules/expo-notifications/build/DevicePushTokenAutoRegistration.fx.js
++++ b/node_modules/expo-notifications/build/DevicePushTokenAutoRegistration.fx.js
+@@ -1,5 +1,6 @@
+ import 'abort-controller/polyfill';
+-import { UnavailabilityError } from 'expo-modules-core';
++import { Platform, UnavailabilityError } from 'expo-modules-core';
++import { isRunningInExpoGo } from 'expo';
+ import ServerRegistrationModule from './ServerRegistrationModule';
+ import { addPushTokenListener } from './TokenEmitter';
+ import { getDevicePushTokenAsync } from './getDevicePushTokenAsync';
+@@ -72,7 +73,26 @@ export async function __handlePersistedRegistrationInfoAsync(registrationInfo) {
+         console.warn('[expo-notifications] Error encountered while updating server registration with latest device push token.', e);
+     }
+ }
+-if (ServerRegistrationModule.getRegistrationInfoAsync) {
++// PATCH (huertoapp, https://github.com/expo/expo/issues/49044): esta app NUNCA
++// usa notificaciones push (solo locales, scheduleNotificationAsync), asi que
++// el auto-registro de push token se omite SIEMPRE -- no solo en Expo Go
++// (donde ya se sabia que este bloque tumbaba el bundle entero al importar,
++// ver fix anterior de este mismo patch), sino tambien en builds nativos
++// reales (preview/production), donde este bloque intenta registrar un
++// listener de push token que en Android dispara el registro con Firebase
++// Cloud Messaging -- y este proyecto no tiene (ni necesita) un
++// google-services.json, porque nunca envia push. Eso encaja exactamente con
++// el patron observado: la app compilaba bien pero se cerraba de inmediato al
++// abrir en un build real (nunca en Expo Go, que ya evitaba este bloque por
++// el guard anterior) y ningun arreglo a nivel de JavaScript (Error Boundary,
++// try/catch de importacion) evitaba el cierre -- consistente con un fallo
++// nativo de Firebase, no un throw de JavaScript capturable.
++// Se mantiene SIEMPRE deshabilitado (antes solo se evitaba en Expo Go):
++const push_deshabilitado_siempre = true;
++if (push_deshabilitado_siempre) {
++    console.warn('[expo-notifications] Auto-registro de push token omitido (esta app solo usa notificaciones locales).');
++}
++else if (ServerRegistrationModule.getRegistrationInfoAsync) {
+     // A global scope (to get all the updates) device push token
+     // subscription, never cleared.
+     addPushTokenListener(async (token) => {
+diff --git a/node_modules/expo-notifications/build/TopicSubscriptionModule.android.js b/node_modules/expo-notifications/build/TopicSubscriptionModule.android.js
+index 644a8bb..fe1d94a 100644
+--- a/node_modules/expo-notifications/build/TopicSubscriptionModule.android.js
++++ b/node_modules/expo-notifications/build/TopicSubscriptionModule.android.js
+@@ -1,3 +1,3 @@
+-import { requireNativeModule } from 'expo-modules-core';
+-export default requireNativeModule('ExpoTopicSubscriptionModule');
++import { requireOptionalNativeModule } from 'expo-modules-core';
++export default requireOptionalNativeModule('ExpoTopicSubscriptionModule');
+ //# sourceMappingURL=TopicSubscriptionModule.android.js.map
+diff --git a/node_modules/expo-notifications/build/topicSubscription.js b/node_modules/expo-notifications/build/topicSubscription.js
+index 31186d6..d24c63b 100644
+--- a/node_modules/expo-notifications/build/topicSubscription.js
++++ b/node_modules/expo-notifications/build/topicSubscription.js
+@@ -8,7 +8,7 @@ import { warnOfExpoGoPushUsage } from './warnOfExpoGoPushUsage';
+  * @platform android
+  */
+ export async function subscribeToTopicAsync(topic) {
+-    if (!TopicSubscriptionModule.subscribeToTopicAsync) {
++    if (!TopicSubscriptionModule?.subscribeToTopicAsync) {
+         throw new UnavailabilityError('ExpoNotifications', 'subscribeToTopicAsync');
+     }
+     warnOfExpoGoPushUsage();
+@@ -21,7 +21,7 @@ export async function subscribeToTopicAsync(topic) {
+  * @platform android
+  */
+ export async function unsubscribeFromTopicAsync(topic) {
+-    if (!TopicSubscriptionModule.unsubscribeFromTopicAsync) {
++    if (!TopicSubscriptionModule?.unsubscribeFromTopicAsync) {
+         throw new UnavailabilityError('ExpoNotifications', 'unsubscribeFromTopicAsync');
+     }
+     warnOfExpoGoPushUsage();

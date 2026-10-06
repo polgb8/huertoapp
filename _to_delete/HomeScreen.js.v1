@@ -1,0 +1,304 @@
+// ============================================================
+// screens/HomeScreen.js — Módulo D: Inicio / Panel del huerto.
+// Agrega, en un único sitio, las 3 novedades que no pertenecen a
+// una foto ni a un cultivo concreto, sino al huerto en su conjunto:
+//   - Balance Hídrico Digital (cálculo real, no una estimación de la IA)
+//   - Alertas estacionales de poda (según la ventana biológica de cada árbol)
+//   - Tareas pendientes (protocolo de saneamiento post-cosecha, etc.)
+// ============================================================
+
+import React, { useState, useCallback, useRef } from 'react';
+import { View, Text, StyleSheet, ScrollView, RefreshControl, Modal, Alert } from 'react-native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import * as Haptics from 'expo-haptics';
+
+import { colors, spacing, tipografia } from '../theme';
+import { Card, BotonPrimario, BotonSecundario } from '../components/UI';
+import { useAppStore } from '../store';
+import { calcularBalanceHidrico } from '../clima';
+import { listarPlantasConPoda, listarTareasPendientes, marcarTareaCompletada, supabase } from '../supabase';
+import { mensajeDeError } from '../utils';
+
+// mesEnVentana: comprueba si el mes actual (1-12) cae dentro de la
+// ventana [inicio, fin]. Cuando inicio > fin, la ventana cruza el año
+// (p.ej. diciembre(12) a febrero(2): son válidos 12, 1 y 2).
+function mesEnVentana(mesActual, inicio, fin) {
+  if (inicio == null || fin == null) return false;
+  if (inicio <= fin) return mesActual >= inicio && mesActual <= fin;
+  return mesActual >= inicio || mesActual <= fin;
+}
+
+const NOMBRES_MES = [
+  'enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
+  'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre',
+];
+
+export default function HomeScreen() {
+  const navigation = useNavigation();
+  const coords = useAppStore((s) => s.coords);
+  const usuario = useAppStore((s) => s.usuario);
+
+  const [compartirVisible, setCompartirVisible] = useState(false);
+  const [cerrandoSesion, setCerrandoSesion] = useState(false);
+
+  const [balance, setBalance] = useState(null);
+  const [cargandoBalance, setCargandoBalance] = useState(false);
+
+  const [plantasPoda, setPlantasPoda] = useState([]);
+  const [tareas, setTareas] = useState([]);
+  const [cargandoPanel, setCargandoPanel] = useState(false);
+  const [errorMsg, setErrorMsg] = useState(null);
+  const [tareaActualizando, setTareaActualizando] = useState(null);
+
+  const isMountedRef = useRef(true);
+  React.useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
+  const cargarPanel = useCallback(async () => {
+    setCargandoPanel(true);
+    setErrorMsg(null);
+    try {
+      const [plantas, pendientes] = await Promise.all([
+        listarPlantasConPoda().catch(() => []),
+        listarTareasPendientes().catch(() => []),
+      ]);
+      if (!isMountedRef.current) return;
+
+      const mesActual = new Date().getMonth() + 1; // getMonth() es 0-indexado
+      const enVentana = plantas.filter((p) => mesEnVentana(mesActual, p.mes_poda_inicio, p.mes_poda_fin));
+      setPlantasPoda(enVentana);
+      setTareas(pendientes);
+    } catch (e) {
+      console.log('Error al cargar el panel de Inicio:', e?.message);
+      if (isMountedRef.current) setErrorMsg(mensajeDeError(e));
+    } finally {
+      if (isMountedRef.current) setCargandoPanel(false);
+    }
+  }, []);
+
+  const cargarBalance = useCallback(async () => {
+    if (!coords) return;
+    setCargandoBalance(true);
+    try {
+      const valor = await calcularBalanceHidrico(coords.lat, coords.lon);
+      if (isMountedRef.current) setBalance(valor);
+    } finally {
+      if (isMountedRef.current) setCargandoBalance(false);
+    }
+  }, [coords]);
+
+  useFocusEffect(
+    useCallback(() => {
+      cargarPanel();
+      cargarBalance();
+    }, [cargarPanel, cargarBalance])
+  );
+
+  const completarTarea = useCallback(async (tarea) => {
+    setTareaActualizando(tarea.id);
+    try {
+      await marcarTareaCompletada(tarea.id);
+      setTareas((prev) => prev.filter((t) => t.id !== tarea.id));
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+    } catch (e) {
+      console.log('Error al completar tarea:', e?.message);
+      if (isMountedRef.current) setErrorMsg(mensajeDeError(e));
+    } finally {
+      if (isMountedRef.current) setTareaActualizando(null);
+    }
+  }, []);
+
+  const cargando = cargandoPanel || cargandoBalance;
+
+  const cerrarSesion = useCallback(() => {
+    Alert.alert('Cerrar sesión', '¿Seguro que quieres salir de tu cuenta en este dispositivo?', [
+      { text: 'Cancelar', style: 'cancel' },
+      {
+        text: 'Cerrar sesión',
+        style: 'destructive',
+        onPress: async () => {
+          setCerrandoSesion(true);
+          try {
+            await supabase.auth.signOut();
+          } catch (e) {
+            console.log('Error al cerrar sesión:', e?.message);
+          } finally {
+            setCerrandoSesion(false);
+            setCompartirVisible(false);
+          }
+        },
+      },
+    ]);
+  }, []);
+
+  return (
+    <>
+    <ScrollView
+      style={estilos.contenedor}
+      contentContainerStyle={estilos.contenido}
+      refreshControl={
+        <RefreshControl
+          refreshing={cargando}
+          onRefresh={() => {
+            cargarPanel();
+            cargarBalance();
+          }}
+        />
+      }
+    >
+      <Text style={tipografia.titulo}>Tu huerto hoy</Text>
+
+      {!!errorMsg && <Text style={estilos.error}>{errorMsg}</Text>}
+
+      {/* Balance Hídrico Digital */}
+      <Card style={estilos.tarjeta}>
+        <Text style={estilos.etiquetaSeccion}>💧 Riego de hoy</Text>
+        {!coords ? (
+          <>
+            <Text style={estilos.textoCuerpo}>
+              Activa tu ubicación en "Planificar" para ver aquí el balance de riego real de tu huerto.
+            </Text>
+            <BotonSecundario
+              titulo="Ir a Planificar"
+              onPress={() => navigation.navigate('Planificar')}
+              style={estilos.botonAccion}
+            />
+          </>
+        ) : cargandoBalance && !balance ? (
+          <Text style={estilos.textoCuerpo}>Calculando…</Text>
+        ) : balance ? (
+          <>
+            <Text style={estilos.textoCuerpoGrande}>{balance.mensaje}</Text>
+            {balance.lluviaAcumuladaMm != null && (
+              <Text style={estilos.detalle}>
+                Lluvia últimas 48h: {balance.lluviaAcumuladaMm} mm
+                {balance.etoHoyMm != null ? ` · Demanda de hoy: ${balance.etoHoyMm} mm` : ''}
+              </Text>
+            )}
+          </>
+        ) : (
+          <Text style={estilos.textoCuerpo}>Sin datos todavía. Desliza hacia abajo para actualizar.</Text>
+        )}
+      </Card>
+
+      {/* Alertas estacionales de poda */}
+      {plantasPoda.map((p) => (
+        <Card key={p.id} style={[estilos.tarjeta, estilos.tarjetaAlerta]}>
+          <Text style={estilos.etiquetaSeccion}>🌳 Toca podar: {p.nombre}</Text>
+          <Text style={estilos.textoCuerpo}>
+            Estás en la ventana tradicional de poda ({NOMBRES_MES[p.mes_poda_inicio - 1]}–{NOMBRES_MES[p.mes_poda_fin - 1]}).
+          </Text>
+          <BotonPrimario
+            titulo="Ir a podar"
+            onPress={() => navigation.navigate('Escanear', { modoInicial: 'poda' })}
+            style={estilos.botonAccion}
+          />
+        </Card>
+      ))}
+
+      {/* Tareas pendientes (saneamiento post-cosecha, etc.) */}
+      {tareas.length > 0 && (
+        <>
+          <Text style={estilos.subtituloSeccion}>Tareas pendientes</Text>
+          {tareas.map((t) => (
+            <Card key={t.id} style={estilos.tarjeta}>
+              <Text style={tipografia.subtitulo}>{t.titulo}</Text>
+              {!!t.descripcion && <Text style={estilos.textoCuerpo}>{t.descripcion}</Text>}
+              {Array.isArray(t.pasos) &&
+                t.pasos.map((paso, i) => (
+                  <Text key={i} style={estilos.pasoTexto}>
+                    {i + 1}. {paso}
+                  </Text>
+                ))}
+              <BotonSecundario
+                titulo={tareaActualizando === t.id ? 'Guardando…' : 'Marcar como hecho'}
+                onPress={() => completarTarea(t)}
+                style={estilos.botonAccion}
+              />
+            </Card>
+          ))}
+        </>
+      )}
+
+      {!cargando && plantasPoda.length === 0 && tareas.length === 0 && (
+        <Text style={estilos.textoVacio}>No tienes alertas ni tareas pendientes por ahora.</Text>
+      )}
+
+      {/* Compartir huerto: acceso a la cuenta y a cerrar sesión */}
+      <Card style={[estilos.tarjeta, estilos.tarjetaCompartir]}>
+        <Text style={estilos.etiquetaSeccion}>🤝 Compartir huerto</Text>
+        <Text style={estilos.textoCuerpo}>
+          {usuario?.email ? `Conectado como ${usuario.email}` : 'Sesión iniciada'}
+        </Text>
+        <BotonSecundario
+          titulo="Ver cómo compartirlo"
+          onPress={() => setCompartirVisible(true)}
+          style={estilos.botonAccion}
+        />
+      </Card>
+    </ScrollView>
+
+    <Modal
+      visible={compartirVisible}
+      animationType="slide"
+      transparent
+      onRequestClose={() => setCompartirVisible(false)}
+    >
+      <View style={estilos.modalFondo}>
+        <View style={estilos.modalPanel}>
+          <Text style={tipografia.titulo}>Compartir huerto</Text>
+          <Text style={estilos.modalTexto}>
+            {usuario?.email ? `Has entrado como ${usuario.email}.` : 'Has iniciado sesión.'}
+          </Text>
+          <Text style={estilos.modalTexto}>
+            Para compartir este huerto con otra persona, dile que se descargue la app y cree su
+            propia cuenta con su email en la pantalla de inicio de sesión: verá exactamente el
+            mismo huerto que tú, porque no hay huertos separados por cuenta, es uno compartido.
+          </Text>
+          <BotonPrimario
+            titulo={cerrandoSesion ? 'Cerrando…' : 'Cerrar sesión'}
+            onPress={cerrarSesion}
+            cargando={cerrandoSesion}
+            style={estilos.botonAccion}
+          />
+          <BotonSecundario
+            titulo="Cerrar"
+            onPress={() => setCompartirVisible(false)}
+            style={estilos.botonAccion}
+          />
+        </View>
+      </View>
+    </Modal>
+    </>
+  );
+}
+
+const estilos = StyleSheet.create({
+  contenedor: { flex: 1, backgroundColor: colors.background },
+  contenido: { padding: spacing.lg, paddingBottom: spacing.xl },
+  error: { fontSize: 14, color: colors.danger, marginBottom: spacing.md },
+  tarjeta: { marginTop: spacing.md },
+  tarjetaAlerta: { borderWidth: 1, borderColor: colors.mint },
+  tarjetaCompartir: { borderWidth: 1, borderColor: colors.border },
+  modalFondo: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.4)' },
+  modalPanel: {
+    backgroundColor: colors.card,
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    padding: spacing.lg,
+    paddingBottom: spacing.xl,
+  },
+  modalTexto: { fontSize: 14, color: colors.textSecondary, marginTop: spacing.sm },
+  etiquetaSeccion: { fontSize: 14, fontWeight: '700', color: colors.textPrimary, marginBottom: spacing.xs },
+  subtituloSeccion: { fontSize: 16, fontWeight: '700', color: colors.textPrimary, marginTop: spacing.lg },
+  textoCuerpo: { fontSize: 14, color: colors.textSecondary, marginTop: 2 },
+  textoCuerpoGrande: { fontSize: 16, color: colors.textPrimary, fontWeight: '600' },
+  detalle: { fontSize: 12, color: colors.textSecondary, marginTop: spacing.xs },
+  pasoTexto: { fontSize: 14, color: colors.textPrimary, marginTop: 4 },
+  botonAccion: { marginTop: spacing.md },
+  textoVacio: { fontSize: 14, color: colors.textSecondary, textAlign: 'center', marginTop: spacing.xl },
+});
