@@ -1,0 +1,64 @@
+{
+  "expo": {
+    "name": "HuertoApp",
+    "slug": "huertoapp",
+    "version": "1.1.2",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "plugins": [
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "HuertoApp necesita la camara para diagnosticar tus plantas."
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "HuertoApp usa tu ubicacion para sugerir cultivos de temporada adecuados a tu zona."
+        }
+      ],
+      "expo-image",
+      "expo-updates"
+    ],
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#E6F4FE",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "softwareKeyboardLayoutMode": "resize",
+      "package": "com.polgaba.huertoapp",
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.SCHEDULE_EXACT_ALARM",
+        "android.permission.USE_EXACT_ALARM",
+        "android.permission.POST_NOTIFICATIONS"
+      ],
+      "versionCode": 4
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/272ce47a-8050-46b8-b120-8c4b960df0ec"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "272ce47a-8050-46b8-b120-8c4b960df0ec"
+      }
+    },
+    "owner": "pgb8s-team"
+  }
+}

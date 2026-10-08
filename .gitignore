@@ -1,0 +1,66 @@
+# Learn more https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files
+
+# dependencies
+node_modules/
+
+# Expo
+.expo/
+dist/
+web-build/
+expo-env.d.ts
+
+# Native
+.kotlin/
+*.orig.*
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+
+# Metro
+.metro-health-check*
+
+# debug
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+
+# macOS
+.DS_Store
+*.pem
+
+# local env files (claves reales — nunca a git; .env.example sí se versiona)
+.env
+.env*.local
+
+# typescript
+*.tsbuildinfo
+
+# generated native folders
+/ios
+/android
+
+# Archivos de trabajo / copias (no van al repo)
+_to_delete/
+*.bak
+*.bak_*
+app.json.bak_con_updates
+eas.json.bak_con_updates
+*.log
+
+# Simulación web local (no va al repo)
+_simulacion_web/
+iniciar_simulacion.bat
+
+# Notas personales de desarrollo (no van al repo público)
+CLAUDE.md
+AUDITORIA*.md
+SETUP.md
+0_subir_a_github.bat
+
+# Config de EAS (no se usa: el APK se compila con GitHub Actions)
+eas.json
+*.nuevo
+Abrir_HuertoApp_web.bat
+_web/
